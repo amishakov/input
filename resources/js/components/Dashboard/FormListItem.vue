@@ -1,6 +1,6 @@
 <template>
   <tr>
-    <td class="whitespace-nowrap py-3 pl-4 pr-3 text-sm sm:pl-0">
+    <td class="whitespace-nowrap py-3 pl-4 pr-3 text-sm">
       <div class="flex items-center">
         <FormAvatar v-bind="{ form }" />
         <div class="ml-4">
@@ -24,24 +24,51 @@
       {{ new Date(form.updated_at).toLocaleDateString() }}
     </td>
     <td class="whitespace-nowrap px-3 py-3 text-sm text-grey-500">
-      <template v-if="form.is_trashed">
-        <span
-          class="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20"
-          >Deleted</span
-        >
-      </template>
-      <template v-else-if="form.is_published">
-        <span
-          class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
-          >Published</span
-        >
-      </template>
-      <template v-else>
-        <span
-          class="inline-flex items-center rounded-md bg-grey-50 px-2 py-1 text-xs font-medium text-grey-700 ring-1 ring-inset ring-grey-600/20"
-          >Unpublished</span
-        >
-      </template>
+      <D9Menu use-portal @click="setPublishMenuActive" position="right">
+        <template v-if="form.is_trashed" #button>
+          <span
+            class="inline-flex items-center rounded-md bg-yellow-200 px-2 py-1 text-xs font-medium text-yellow-900 ring-1 ring-inset ring-yellow-800/20"
+            >Archived</span
+          >
+        </template>
+        <template v-else-if="form.is_published" #button>
+          <span
+            class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
+            >Published</span
+          >
+        </template>
+        <template v-else #button>
+          <span
+            class="inline-flex items-center rounded-md bg-grey-50 px-2 py-1 text-xs font-medium text-grey-700 ring-1 ring-inset ring-grey-600/20"
+            >Unpublished</span
+          >
+        </template>
+
+        <D9MenuLink
+          v-if="!form.is_published && !form.is_trashed"
+          as="button"
+          type="button"
+          class="block w-full text-left"
+          label="Set to Published"
+          @click="publishForm"
+        />
+        <D9MenuLink
+          v-if="form.is_published && !form.is_trashed"
+          as="button"
+          type="button"
+          class="block w-full text-left"
+          label="Set to Unpublished"
+          @click="unpublishForm"
+        />
+        <D9MenuLink
+          v-if="!form.is_published && !form.is_trashed"
+          as="button"
+          type="button"
+          class="block w-full text-left"
+          label="Archive Form"
+          @click="deleteForm"
+        />
+      </D9Menu>
     </td>
     <td class="whitespace-nowrap px-3 py-3 text-sm text-grey-500">
       <div class="flex space-x-3">
@@ -72,7 +99,7 @@
       </div>
     </td>
     <td
-      class="relative whitespace-nowrap py-3 pl-3 pr-4 text-right text-sm font-medium sm:pr-0"
+      class="relative whitespace-nowrap py-3 pl-3 pr-4 text-right text-sm font-medium"
     >
       <div class="flex items-center justify-end space-x-2">
         <a v-if="!form.is_trashed" :href="route('forms.edit', form.uuid)">
@@ -111,30 +138,6 @@
               :href="route('forms.settings', form.uuid)"
               class="block w-full text-left"
               label="Settings"
-            />
-            <D9MenuLink
-              v-if="!form.is_published && !form.is_trashed"
-              as="button"
-              type="button"
-              class="block w-full text-left"
-              label="Publish Form"
-              @click="publishForm"
-            />
-            <D9MenuLink
-              v-if="form.is_published && !form.is_trashed"
-              as="button"
-              type="button"
-              class="block w-full text-left"
-              label="Unpublish Form"
-              @click="unpublishForm"
-            />
-            <D9MenuLink
-              v-if="!form.is_published && !form.is_trashed"
-              as="button"
-              type="button"
-              class="block w-full text-left"
-              label="Delete Form"
-              @click="deleteForm"
             />
             <D9MenuLink
               as="button"
@@ -186,6 +189,7 @@ const props = defineProps<{
 
 const container = ref(null);
 const isActive = ref(false);
+const isPublishMenuActive = ref(false);
 
 onClickOutside(container, () => {
   isActive.value = false;
@@ -193,6 +197,10 @@ onClickOutside(container, () => {
 
 const setActive = () => {
   isActive.value = true;
+};
+
+const setPublishMenuActive = () => {
+  isPublishMenuActive.value = true;
 };
 
 const duplicateForm = async () => {
@@ -229,15 +237,17 @@ const unpublishForm = async () => {
 };
 
 const restoreForm = async () => {
-  const restored = await callRestoreForm(props.form);
+  await callRestoreForm(props.form);
 
-  window.location.href = window.route("forms.edit", {
-    uuid: restored.data.uuid,
-  });
+  window.location.reload();
 };
 
 const deleteForm = async () => {
-  window.confirm("Are you sure you want to delete your form?");
+  const result = window.confirm("Are you sure you want to delete your form?");
+
+  if (!result) {
+    return;
+  }
 
   await callDeleteForm(props.form);
 
@@ -245,9 +255,13 @@ const deleteForm = async () => {
 };
 
 const deleteForever = async () => {
-  window.confirm(
+  const result = window.confirm(
     "Are you sure you want to delete your form permanently. This action cannot be undone.",
   );
+
+  if (!result) {
+    return;
+  }
 
   await callDeleteForeverForm(props.form);
 
